@@ -45,8 +45,8 @@ func main() {
       uint16(c.Int("port")),
       c.String("user"),
       c.String("pass"),
-      };
-    data, err := rabbitmq.Monitor();
+    };
+    data, err := rabbitmq.Monitor("");
     if err != nil {
       fatalError(err);
     } else {

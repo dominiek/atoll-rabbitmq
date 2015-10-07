@@ -2,7 +2,7 @@
 package main
 
 import (
-  //"github.com/jeffail/gabs"
+  "github.com/jeffail/gabs"
   "fmt"
   "net/http"
   "errors"
@@ -16,17 +16,16 @@ type RabbitMQ struct {
   pass string;
 };
 
-func (this RabbitMQ) Monitor() (string, error) {
-  data, err := this.QueueStats("");
+func (this RabbitMQ) Monitor(url string) (string, error) {
+  data, err := this.QueueStats(url);
   if err != nil {
     return "", err
   }
-  return data, nil;
 
-  //atollReport, err := this.statsToAtollReport(data);
-  //return atollReport, nil
+  atollReport, err := this.statsToAtollReport(data);
+  return atollReport, nil
 }
-/*
+
 func (this RabbitMQ) statsToAtollReport(data string) (string, error) {
   statsParsed, err := gabs.ParseJSON([]byte(data))
   if err != nil {
@@ -34,36 +33,36 @@ func (this RabbitMQ) statsToAtollReport(data string) (string, error) {
   }
   atollReport := gabs.New();
 
-  // Main state
-  state := "error";
-  esStatus := statsParsed.S("status").Data().(string);
-  if esStatus == "green" {
-    state = "ok";
-  } else if esStatus == "yellow" {
-    state = "warn";
+  atollReport.ArrayP("report.items");
+
+  var children,_ = statsParsed.S("result").Children();
+  for i,child := range children {
+      atollReport.ArrayAppendP(map[string]interface{}{}, "report.items");
+      atollItem := atollReport.S("report").S("items").Index(i);
+      atollItem.SetP(child.S("name").Data().(string), "name");
+      atollItem.SetP([1]string{"queue"}, "classes");
+
+      // Queue stats
+      atollItem.SetP([2]string{"memory", "bytes"}, "stats.memoryUsage.classes");
+      atollItem.SetP(child.S("memory").Data().(float64), "stats.memoryUsage.value");
+      atollItem.SetP([2]string{"messages", "count"}, "stats.numMessages.classes");
+      atollItem.SetP(child.S("messages").Data().(float64), "stats.numMessages.value");
+
+      publishRate := child.S("message_stats").S("publish_details").S("rate");
+      if publishRate.String() != "{}" {
+        atollItem.SetP([3]string{"throughput", "per-second", "average"}, "stats.publishRate.classes");
+        atollItem.SetP(publishRate.Data().(float64), "stats.publishRate.value");
+      }
+      deliverRate := child.S("message_stats").S("deliver_get_details").S("rate");
+      if deliverRate.String() != "{}" {
+        atollItem.SetP([3]string{"throughput", "per-second", "average"}, "stats.deliverRate.classes");
+        atollItem.SetP(deliverRate.Data().(float64), "stats.deliverRate.value");
+      }
   }
-  atollReport.SetP(state, "report.status.state");
-
-  // Num Nodes
-  atollReport.SetP(statsParsed.S("nodes").S("count").S("total").Data().(float64), "report.stats.numberOfNodes.value");
-
-  // Core caches
-  atollReport.SetP(statsParsed.S("indices").S("fielddata").S("memory_size_in_bytes").Data().(float64)/1024/1024, "report.stats.fieldDataCacheSize.value");
-  atollReport.SetP([2]string{"megabytes", "memory"}, "report.stats.fieldDataCacheSize.classes");
-  atollReport.SetP(statsParsed.S("indices").S("filter_cache").S("memory_size_in_bytes").Data().(float64)/1024/1024, "report.stats.filterCacheSize.value");
-  atollReport.SetP([2]string{"megabytes", "memory"}, "report.stats.filterCacheSize.classes");
-  atollReport.SetP(statsParsed.S("indices").S("id_cache").S("memory_size_in_bytes").Data().(float64)/1024/1024, "report.stats.idCacheSize.value");
-  atollReport.SetP([2]string{"megabytes", "memory"}, "report.stats.idCacheSize.classes");
-
-  // JVM stats
-  atollReport.SetP(statsParsed.S("nodes").S("jvm").S("mem").S("heap_used_in_bytes").Data().(float64)/1024/1024, "report.stats.jvmHeapUsage.value");
-  atollReport.SetP([2]string{"megabytes", "memory"}, "report.stats.jvmHeapUsage.classes");
-  atollReport.SetP(statsParsed.S("nodes").S("jvm").S("mem").S("heap_max_in_bytes").Data().(float64)/1024/1024, "report.stats.jvmHeapSize.value");
-  atollReport.SetP([2]string{"megabytes", "memory"}, "report.stats.jvmHeapSize.classes");
 
   return atollReport.String(), nil;
 }
-*/
+
 func (this RabbitMQ) QueueStats(url string) (string, error) {
   if len(url) == 0 {
     url = fmt.Sprintf("http://%s:%d/api/queues", this.host, this.port);
