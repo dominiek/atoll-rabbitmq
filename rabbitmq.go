@@ -32,6 +32,8 @@ func (this RabbitMQ) statsToAtollReport(data string) (string, error) {
     return "", err
   }
   atollReport := gabs.New();
+  atollReport.SetP("rabbitmq", "id");
+  atollReport.SetP("RabbitMQ", "name");
 
   atollReport.ArrayP("report.items");
 
